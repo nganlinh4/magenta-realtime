@@ -305,24 +305,7 @@ class MagentaRTBase(abc.ABC):
     return self.generate_chunk(*args, **kwargs)
 
 
-class MockMagentaRT(MagentaRTBase):
-  """Mock stateless Magenta RT system that just serves noise."""
-
-  def __init__(
-      self,
-      *args,
-      config: MagentaRTConfiguration = MagentaRTConfiguration(),
-      codec_config: spectrostream.SpectroStreamConfiguration = spectrostream.SpectroStreamConfiguration(),
-      style_config: musiccoca.MusicCoCaConfiguration = musiccoca.MusicCoCaConfiguration(),
-      **kwargs,
-  ):
-    super().__init__(
-        *args,
-        config=config,
-        codec=spectrostream.MockSpectroStream(codec_config),
-        style_model=musiccoca.MockMusicCoCa(style_config),
-        **kwargs,
-    )
+# MockMagentaRT class removed - only real Magenta RT is supported
 
   def generate_chunk(
       self,

@@ -1,0 +1,31 @@
+{
+  "name": "magenta-realtime-studio",
+  "version": "1.0.0",
+  "description": "Real-time AI music generation with Magenta RT and ShadCN UI",
+  "scripts": {
+    "dev": "npm run setup:magenta-rt && concurrently \"npm run dev:backend\" \"npm run dev:frontend\" --names \"🔧backend,🎨frontend\" --prefix-colors \"blue,green\" --kill-others-on-fail",
+    "dev:backend": "./start-backend.sh",
+    "dev:frontend": "cd frontend && npm run dev:frontend-only",
+    "install": "cd frontend && npm install",
+    "install:all": "npm run install && echo '✅ Frontend dependencies installed'",
+    "setup": "npm run install:all && echo '🎉 Setup complete! Run npm run dev to start both servers'",
+    "setup:magenta-rt": "./setup-magenta-rt.sh",
+    "dev:quick": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" --names \"🔧backend,🎨frontend\" --prefix-colors \"blue,green\" --kill-others-on-fail",
+    "test": "python test_complete_setup.py",
+    "clean": "cd frontend && rm -rf .next node_modules && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  },
+  "keywords": [
+    "magenta",
+    "music-generation",
+    "ai",
+    "real-time",
+    "shadcn",
+    "nextjs",
+    "fastapi"
+  ],
+  "author": "Magenta RT Studio",
+  "license": "MIT"
+}

@@ -9,7 +9,21 @@ This project combines Magenta RT (real-time music generation) with a modern Shad
 - Node.js 18+
 - CUDA-compatible GPU (optional, for better performance)
 
-### 1. Python Virtual Environment with JAX CUDA
+### 1. One-Command Setup
+
+```bash
+# Install all dependencies
+npm run setup
+
+# Start both backend and frontend concurrently
+npm run dev
+```
+
+That's it! Both servers will start automatically:
+- **Backend**: `http://localhost:8000` 🔧
+- **Frontend**: `http://localhost:3000` 🎨
+
+### 2. Manual Setup (if needed)
 
 ```bash
 # Create and activate virtual environment
@@ -22,29 +36,24 @@ pip install jax[cuda12] jaxlib
 # Install additional dependencies
 pip install fastapi uvicorn websockets soundfile
 pip install absl-py chex flax gin-config numpy resampy tqdm
+
+# Install frontend dependencies
+cd frontend && npm install
 ```
 
-### 2. Backend Setup
+### 3. Individual Commands
 
 ```bash
-# Start the FastAPI backend
-cd backend
-source ../venv/bin/activate
-python main.py
-```
-
-The backend will be available at `http://localhost:8000`
-
-### 3. Frontend Setup
-
-```bash
-# Install dependencies and start the frontend
-cd frontend
-npm install
+# Start both servers concurrently (recommended)
 npm run dev
-```
 
-The frontend will be available at `http://localhost:3000`
+# Or start individually:
+npm run dev:backend    # Backend only
+npm run dev:frontend   # Frontend only
+
+# Test the complete setup
+npm run test
+```
 
 ## 🎵 Features
 
@@ -138,23 +147,33 @@ The frontend uses ShadCN UI components:
 
 ## 🎵 Usage - Real-time Music Generation
 
-1. **Start both backend and frontend**
+1. **Start the application**:
+   ```bash
+   npm run dev
+   ```
+
 2. **Open** `http://localhost:3000` in your browser
+
 3. **Set up style prompts**:
    - Enter multiple style descriptions (e.g., "synthwave", "flamenco guitar")
-   - Adjust individual weight sliders for each prompt
+   - Adjust individual weight sliders for each prompt (0.0 - 2.0)
    - Mix styles by setting multiple weights > 0
-4. **Adjust sampling parameters**:
+
+4. **Adjust sampling parameters in real-time**:
    - **Temperature**: Controls chaos/creativity (0.0-4.0)
    - **Top-K**: Vocabulary filtering (0-1024)
    - **Guidance**: Style adherence strength (0.0-10.0)
-5. **Start real-time generation**:
-   - Click "Start" to begin streaming
+
+5. **Generate and test audio**:
+   - Click "🎵 Test Generate Single Chunk" to test audio generation
+   - Use the audio controls that appear to play the generated audio
+   - Adjust volume with the slider
+
+6. **Real-time streaming** (experimental):
+   - Click "Start" to begin streaming mode
    - Adjust sliders in real-time to change the music
    - Watch the live status indicators
-6. **Control playback**:
-   - Use "Stop" to halt generation
-   - Use "Reset" to clear state and start fresh
+   - Use "Stop" to halt generation or "Reset" to clear state
 
 ## 🔍 Troubleshooting
 

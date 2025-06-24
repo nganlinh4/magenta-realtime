@@ -434,49 +434,7 @@ class MusicCoCaV212F(MusicCoCaBase):
     return np.array(embeddings)
 
 
-class MockMusicCoCa(MusicCoCaBase):
-  """A mock MusicCoCa model that returns random embeddings and tokens."""
-
-  def __init__(
-      self,
-      config: MusicCoCaConfiguration = MusicCoCaConfiguration(),
-      *args,
-      **kwargs,
-  ):
-    super().__init__(config, *args, **kwargs)
-
-  @property
-  def _rvq_codebooks(self) -> np.ndarray:
-    np.random.seed(0)
-    return np.random.randn(
-        self.config.rvq_depth,
-        self.config.rvq_codebook_size,
-        self.config.embedding_dim,
-    ).astype(np.float32)
-
-  def _embed_batch_text(
-      self,
-      batch_text: BatchText,
-  ) -> BatchStyleEmbedding:
-    result = []
-    for s in batch_text:
-      np.random.seed(hash(s) % 2**32)
-      result.append(
-          np.random.randn(self.config.embedding_dim).astype(np.float32)
-      )
-    return np.array(result)
-
-  def _embed_batch_clips(
-      self,
-      batch_clips: np.ndarray,
-  ) -> BatchStyleEmbedding:
-    result = []
-    for c in batch_clips:
-      np.random.seed(hash(c.tobytes()) % 2**32)
-      result.append(
-          np.random.randn(self.config.embedding_dim).astype(np.float32)
-      )
-    return np.array(result)
+# MockMusicCoCa class removed - only real MusicCoCa is supported
 
 
 MusicCoCa = MusicCoCaV212F  # Alias to indicate default codepath.

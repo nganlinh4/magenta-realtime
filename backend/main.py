@@ -9,6 +9,7 @@ import base64
 import io
 import json
 import logging
+import os
 from typing import Optional, Dict, Any, List
 import traceback
 
@@ -18,6 +19,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
+
+# Load environment variables from .env file if it exists
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv not installed, skip loading .env file
+    pass
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -67,61 +76,55 @@ class HealthResponse(BaseModel):
     magenta_rt_loaded: bool
     gpu_available: bool
     jax_version: str
+    system_type: str  # "real" or "none"
 
 def initialize_magenta_rt():
     """Initialize the Magenta RT system."""
     global magenta_rt_system
+
     try:
-        import jax
+        logger.info("🚀 Initializing Magenta RT system...")
+        logger.info("📥 This may take several minutes to download models and initialize...")
 
-        logger.info("Initializing Mock Magenta RT system...")
+        # Import the real Magenta RT system
+        from magenta_rt.system import MagentaRT
 
-        # For now, create a simple mock system that generates random audio
-        class SimpleMockMagentaRT:
-            def __init__(self):
-                self.sample_rate = 48000
-                self.chunk_length = 2.0
-                self.chunk_samples = int(self.sample_rate * self.chunk_length)
+        # Configuration from environment variables
+        device = os.getenv('MAGENTA_RT_DEVICE', 'gpu')  # 'gpu' or 'tpu:v2-8' (cpu not supported)
+        model_tag = os.getenv('MAGENTA_RT_MODEL', 'base')  # 'base' or 'large'
 
-            def embed_style(self, text_or_audio):
-                # Return a random style embedding
-                return np.random.randn(768).astype(np.float32)
+        logger.info(f"🎯 Loading Magenta RT model: {model_tag} on device: {device}")
 
-            def generate_chunk(self, state=None, style=None, seed=None, **kwargs):
-                # Generate random audio chunk
-                if seed is not None:
-                    np.random.seed(seed)
+        # Use HuggingFace for easier model downloads (no Google Cloud required)
+        os.environ['MAGENTA_RT_ASSET_SOURCE'] = 'hf'
+        logger.info("🤗 Using HuggingFace for model downloads (no Google Cloud required)")
 
-                # Create a simple audio chunk (sine wave with some noise)
-                t = np.linspace(0, self.chunk_length, self.chunk_samples)
-                frequency = 440 + np.random.randn() * 50  # Random frequency around A4
-                audio = 0.3 * np.sin(2 * np.pi * frequency * t) + 0.1 * np.random.randn(self.chunk_samples)
+        # Initialize the real Magenta RT system
+        magenta_rt_system = MagentaRT(
+            tag=model_tag,
+            device=device,
+            lazy=False,  # Load immediately for better startup feedback
+            skip_cache=False  # Use cache for faster subsequent loads
+        )
 
-                # Make it stereo
-                audio_stereo = np.column_stack([audio, audio])
+        logger.info("✅ Magenta RT system initialized successfully!")
+        logger.info("🎵 Ready to generate AI music!")
 
-                # Create a simple state object
-                class SimpleState:
-                    def __init__(self, chunk_index=0):
-                        self.chunk_index = chunk_index
-
-                # Create audio object
-                class SimpleAudio:
-                    def __init__(self, samples, sample_rate):
-                        self.samples = samples
-                        self.sample_rate = sample_rate
-
-                new_state = SimpleState(0 if state is None else state.chunk_index + 1)
-                audio_obj = SimpleAudio(audio_stereo, self.sample_rate)
-
-                return audio_obj, new_state
-
-        magenta_rt_system = SimpleMockMagentaRT()
-        logger.info("Mock Magenta RT system initialized successfully")
+    except ImportError as e:
+        logger.error(f"❌ Failed to import Magenta RT: {e}")
+        logger.error("💡 Make sure magenta-rt is properly installed:")
+        logger.error("   pip install 'git+https://github.com/magenta/magenta-realtime#egg=magenta_rt[gpu]'")
+        raise RuntimeError(f"Magenta RT import failed: {e}")
 
     except Exception as e:
-        logger.error(f"Failed to initialize Mock Magenta RT: {e}")
-        magenta_rt_system = None
+        logger.error(f"❌ Failed to initialize Magenta RT: {e}")
+        logger.error("💡 This might be due to:")
+        logger.error("   - Incompatible JAX/XLA versions (try updating)")
+        logger.error("   - Insufficient GPU memory")
+        logger.error("   - Network issues during model download")
+        logger.error("   - Missing model files")
+        logger.error(f"   - Error details: {str(e)}")
+        raise RuntimeError(f"Magenta RT initialization failed: {e}")
 
 def audio_to_base64(audio_samples: np.ndarray, sample_rate: int) -> str:
     """Convert audio samples to base64 encoded WAV."""
@@ -167,12 +170,19 @@ async def health_check():
     except ImportError:
         jax_version = "not available"
         gpu_available = False
-    
+
+    # Determine system type
+    if magenta_rt_system is None:
+        system_type = "none"
+    else:
+        system_type = "real"
+
     return HealthResponse(
         status="healthy" if magenta_rt_system is not None else "degraded",
         magenta_rt_loaded=magenta_rt_system is not None,
         gpu_available=gpu_available,
-        jax_version=jax_version
+        jax_version=jax_version,
+        system_type=system_type
     )
 
 @app.post("/api/embed-style")

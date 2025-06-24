@@ -43,9 +43,11 @@ export function MagentaRTStudio() {
   const [guidanceWeight, setGuidanceWeight] = useState([5.0]);
   const [volume, setVolume] = useState([0.7]);
 
-  // Audio context
+  // Audio context and playback
   const audioContextRef = useRef<AudioContext | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
 
   const {
     generateChunk,
@@ -70,6 +72,23 @@ export function MagentaRTStudio() {
     ));
   }, []);
 
+  // Convert base64 audio to blob URL for playback
+  const base64ToAudioUrl = useCallback((base64Data: string) => {
+    try {
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'audio/wav' });
+      return URL.createObjectURL(blob);
+    } catch (error) {
+      console.error('Failed to convert base64 to audio URL:', error);
+      return null;
+    }
+  }, []);
+
   // Create weighted style embedding from multiple prompts
   const createWeightedEmbedding = useCallback(async (prompts: StylePrompt[]) => {
     const activePrompts = prompts.filter(p => p.text.trim() && p.weight > 0);
@@ -91,37 +110,77 @@ export function MagentaRTStudio() {
     setIsStreaming(true);
     setIsPlaying(true);
 
-    // Start a simple streaming loop
-    const streamingLoop = async () => {
-      try {
-        const styleEmbedding = await createWeightedEmbedding(stylePrompts);
-        if (styleEmbedding && isStreaming) {
-          await generateChunk({
-            style_embedding: styleEmbedding,
-            temperature: temperature[0],
-            topk: topK[0],
-            guidance_weight: guidanceWeight[0]
-          });
-        }
-      } catch (err) {
-        console.error('Streaming error:', err);
-      }
-    };
+    try {
+      // Generate and play audio chunk
+      const styleEmbedding = await createWeightedEmbedding(stylePrompts);
+      if (styleEmbedding) {
+        const chunk = await generateChunk({
+          style_embedding: styleEmbedding,
+          temperature: temperature[0],
+          topk: topK[0],
+          guidance_weight: guidanceWeight[0]
+        });
 
-    // Generate first chunk
-    streamingLoop();
-  }, [isConnected, stylePrompts, temperature, topK, guidanceWeight, createWeightedEmbedding, generateChunk, isStreaming]);
+        if (chunk && chunk.audio_data) {
+          // Convert to audio URL and play
+          const audioUrl = base64ToAudioUrl(chunk.audio_data);
+          if (audioUrl) {
+            // Clean up previous audio URL
+            if (currentAudioUrl) {
+              URL.revokeObjectURL(currentAudioUrl);
+            }
+
+            setCurrentAudioUrl(audioUrl);
+
+            // Play the audio
+            if (audioElementRef.current) {
+              audioElementRef.current.src = audioUrl;
+              audioElementRef.current.volume = volume[0];
+              try {
+                await audioElementRef.current.play();
+                console.log('Audio playing successfully');
+              } catch (playError) {
+                console.error('Failed to play audio:', playError);
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Streaming error:', err);
+      setIsStreaming(false);
+      setIsPlaying(false);
+    }
+  }, [isConnected, stylePrompts, temperature, topK, guidanceWeight, createWeightedEmbedding, generateChunk, base64ToAudioUrl, currentAudioUrl, volume]);
 
   const handleStopStreaming = useCallback(() => {
     setIsStreaming(false);
     setIsPlaying(false);
+
+    // Stop audio playback
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current.currentTime = 0;
+    }
   }, []);
 
   const handleReset = useCallback(() => {
     setIsStreaming(false);
     setIsPlaying(false);
     setStreamingProgress(0);
-  }, []);
+
+    // Stop and reset audio
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current.currentTime = 0;
+    }
+
+    // Clean up audio URL
+    if (currentAudioUrl) {
+      URL.revokeObjectURL(currentAudioUrl);
+      setCurrentAudioUrl(null);
+    }
+  }, [currentAudioUrl]);
 
   // Initialize audio context
   useEffect(() => {
@@ -142,6 +201,13 @@ export function MagentaRTStudio() {
       setStreamingProgress((chunkIndex % 10) * 10); // Simple progress indicator
     }
   }, [isStreaming, chunkIndex]);
+
+  // Update audio volume when volume slider changes
+  useEffect(() => {
+    if (audioElementRef.current) {
+      audioElementRef.current.volume = volume[0];
+    }
+  }, [volume]);
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -245,7 +311,7 @@ export function MagentaRTStudio() {
               </p>
             </div>
 
-            <div className="pt-4 border-t">
+            <div className="pt-4 border-t space-y-2">
               <div className="flex gap-2">
                 <Button
                   onClick={isStreaming ? handleStopStreaming : handleStartStreaming}
@@ -274,6 +340,39 @@ export function MagentaRTStudio() {
                   <RotateCcw className="h-4 w-4" />
                 </Button>
               </div>
+
+              {/* Test button for single generation */}
+              <Button
+                onClick={async () => {
+                  try {
+                    const styleEmbedding = await createWeightedEmbedding(stylePrompts);
+                    if (styleEmbedding) {
+                      const chunk = await generateChunk({
+                        style_embedding: styleEmbedding,
+                        temperature: temperature[0],
+                        topk: topK[0],
+                        guidance_weight: guidanceWeight[0]
+                      });
+
+                      if (chunk && chunk.audio_data) {
+                        const audioUrl = base64ToAudioUrl(chunk.audio_data);
+                        if (audioUrl) {
+                          if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
+                          setCurrentAudioUrl(audioUrl);
+                          console.log('Generated audio chunk, URL created');
+                        }
+                      }
+                    }
+                  } catch (err) {
+                    console.error('Test generation failed:', err);
+                  }
+                }}
+                variant="outline"
+                className="w-full"
+                disabled={!isConnected}
+              >
+                🎵 Test Generate Single Chunk
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -375,7 +474,7 @@ export function MagentaRTStudio() {
             )}
 
             <div className="mt-4 pt-4 border-t">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-4">
                 <Volume2 className="h-4 w-4" />
                 <span className="text-sm font-medium">Volume: {Math.round(volume[0] * 100)}%</span>
                 <Slider
@@ -387,6 +486,36 @@ export function MagentaRTStudio() {
                   className="flex-1 ml-2"
                 />
               </div>
+
+              {/* Hidden audio element for playback */}
+              <audio
+                ref={audioElementRef}
+                onEnded={() => {
+                  setIsPlaying(false);
+                  setIsStreaming(false);
+                }}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onError={(e) => {
+                  console.error('Audio playback error:', e);
+                  setIsPlaying(false);
+                  setIsStreaming(false);
+                }}
+                style={{ display: 'none' }}
+              />
+
+              {/* Audio controls for debugging */}
+              {currentAudioUrl && (
+                <div className="mt-2 p-2 bg-secondary rounded">
+                  <div className="text-xs text-muted-foreground mb-1">Audio Controls (for testing)</div>
+                  <audio
+                    src={currentAudioUrl}
+                    controls
+                    className="w-full h-8"
+                    style={{ height: '32px' }}
+                  />
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

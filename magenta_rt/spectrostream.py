@@ -290,41 +290,7 @@ class SpectroStreamSavedModel(SpectroStreamBase):
     return self._decoder(embeddings).cpu().numpy()
 
 
-class MockSpectroStream(SpectroStreamBase):
-  """A mock SpectroStream model that returns random embeddings and tokens."""
-
-  def __init__(
-      self,
-      config: SpectroStreamConfiguration = SpectroStreamConfiguration(),
-      *args,
-      **kwargs,
-  ):
-    super().__init__(config, *args, **kwargs)
-
-  @property
-  def _rvq_codebooks(self) -> np.ndarray:
-    np.random.seed(0)
-    return np.random.randn(
-        self.config.rvq_depth,
-        self.config.rvq_codebook_size,
-        self.config.embedding_dim,
-    ).astype(np.float32)
-
-  def _embed_batch(self, samples: BatchAudioSamples) -> BatchAcousticEmbedding:
-    num_seconds = samples.shape[1] / self.config.sample_rate
-    num_frames = int(np.ceil(num_seconds * self.config.frame_rate))
-    return np.random.randn(
-        samples.shape[0], num_frames, self.config.embedding_dim
-    ).astype(np.float32)
-
-  def _reconstruct_batch(
-      self, embeddings: BatchAcousticEmbedding
-  ) -> BatchAudioSamples:
-    num_seconds = embeddings.shape[1] / self.config.frame_rate
-    num_samples = int(np.ceil(num_seconds * self.config.sample_rate))
-    return np.random.randn(
-        embeddings.shape[0], num_samples, self.config.num_channels
-    ).astype(np.float32)
+# MockSpectroStream class removed - only real SpectroStream is supported
 
 
 class SpectroStreamJAX(SpectroStreamSavedModel):
